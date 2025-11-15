@@ -7,6 +7,25 @@ import gzip
 import re
 
 
+def load_test_graph_from_file(file_path):
+    """Минимальная загрузка тестового графа из файла"""
+    test_graph = {}
+    try:
+        with open(file_path, 'r') as file:
+            for line in file:
+                line = line.strip()
+                if ':' in line:
+                    package, deps = line.split(':', 1)
+                    package = package.strip()
+                    if deps.strip():
+                        dependencies = [dep.strip() for dep in deps.split(',')]
+                    else:
+                        dependencies = []
+                    test_graph[package] = dependencies
+        return test_graph
+    except:
+        return {}
+
 def parse_arguments():
     """Парсит аргументы командной строки"""
     parser = argparse.ArgumentParser(
@@ -347,6 +366,36 @@ def demonstrate_reverse_dependencies(args, graph):
 
     print("\nЭтап 4 завершен! Обратные зависимости найдены.")
 
+
+def demonstrate_test_cases():
+    """Простая демонстрация тестовых случаев"""
+    print("\n--- Тестовые случаи ---")
+
+    # Тест 1: Простой граф
+    test1 = {
+        'A': ['B', 'C'],
+        'B': ['D'],
+        'C': ['E'],
+        'D': [],
+        'E': []
+    }
+
+    # Тест 2: Граф с циклом
+    test2 = {
+        'A': ['B'],
+        'B': ['C'],
+        'C': ['A']
+    }
+
+    for i, test_graph in enumerate([test1, test2], 1):
+        print(f"\nТест {i}:")
+        graph, cycles = build_dependency_graph(
+            start_package='A',
+            get_deps_func=lambda pkg: test_graph.get(pkg, []),
+            max_depth=5
+        )
+        print(f"Пакетов: {len(graph)}, Циклов: {len(cycles)}")
+
 def main():
     try:
         args = parse_arguments()
@@ -386,32 +435,33 @@ def main():
 
         def get_dependencies_func(package_name):
             if args.test_mode:
-                # Тестовые данные для демонстрации
-                test_data = {
-                    'python3': ['python3.10', 'libpython3-stdlib', 'python3-minimal'],
-                    'python3.10': ['libc6', 'libssl3', 'zlib1g'],
-                    'libc6': ['libgcc1'],
-                    'libssl3': ['libc6'],
-                    'zlib1g': ['libc6'],
-                    'libpython3-stdlib': ['python3.10'],
-                    'python3-minimal': ['python3.10'],
-                    'libgcc1': []
-                }
-                return test_data.get(package_name, [])
+                # ТЕСТОВЫЙ РЕЖИМ ИЗ ФАЙЛА
+                if not hasattr(get_dependencies_func, 'test_graph'):
+                    # Просто используем repository как путь к файлу
+                    test_graph = load_test_graph_from_file(args.repository)
+                    if not test_graph:
+                        # Если файл не найден, создаем простой тестовый граф
+                        test_graph = {
+                            'A': ['B', 'C'],
+                            'B': ['D'],
+                            'C': ['E'],
+                            'D': [],
+                            'E': []
+                        }
+                    get_dependencies_func.test_graph = test_graph
+
+                return get_dependencies_func.test_graph.get(package_name, [])
+
             else:
-                # РЕАЛЬНЫЙ РЕЖИМ С КЕШИРОВАНИЕМ
-                # Если пакет уже в кеше - возвращаем из кеша
+                # РЕАЛЬНЫЙ РЕЖИМ (старая логика)
                 if package_name in packages_cache:
                     return packages_cache[package_name]
 
-                # Если кеш пустой - скачиваем и парсим весь файл один раз
                 if not packages_cache:
-                    print("Скачиваем файл пакетов... (это займет время)")
+                    print("Скачиваем файл пакетов...")
                     all_packages = download_and_parse_all_packages(args.repository)
                     packages_cache.update(all_packages)
-                    print(f"Загружено {len(packages_cache)} пакетов")
 
-                # Возвращаем зависимости из кеша (или пустой список если пакет не найден)
                 return packages_cache.get(package_name, [])
 
         # Строим граф
@@ -433,6 +483,9 @@ def main():
         print(f"  Всего зависимостей: {stats['total_dependencies']}")
         print(f"  Пакетов без зависимостей: {stats['packages_without_deps']}")
         print(f"  Обнаружено циклов: {len(cycles)}")
+
+        if args.test_mode:
+            demonstrate_test_cases()
 
         print("\nЭтап 3 завершен. Граф зависимостей построен.")
         # ========== КОНЕЦ ЭТАПА 3 ==========
