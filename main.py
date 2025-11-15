@@ -306,6 +306,47 @@ def get_graph_statistics(graph):
         'packages_without_deps': len([deps for deps in graph.values() if not deps])
     }
 
+def find_reverse_dependencies(target_package, graph):
+    """Находит обратные зависимости - пакеты, которые зависят от target_package"""
+    reverse_deps = []
+
+    for package_name, dependencies in graph.items():
+        if target_package in dependencies:
+            reverse_deps.append(package_name)
+
+    return reverse_deps
+
+
+def demonstrate_reverse_dependencies(args, graph):
+    """Демонстрирует поиск обратных зависимостей"""
+    print("\n" + "=" * 40)
+    print("Этап 4: Поиск обратных зависимостей")
+
+    # Находим обратные зависимости для нескольких ключевых пакетов
+    key_packages = ['libc6', 'python3.10']
+
+    for package in key_packages:
+        if package in graph:  # Проверяем что пакет есть в графе
+            reverse_deps = find_reverse_dependencies(package, graph)
+            if reverse_deps:
+                print(f"\nПакеты, зависящие от '{package}':")
+                for dep in reverse_deps:
+                    print(f"  - {dep}")
+            else:
+                print(f"\nНет пакетов, зависящих от '{package}'")
+
+    # Также покажем обратные зависимости для исходного пакета
+    if args.package in graph:
+        reverse_deps_main = find_reverse_dependencies(args.package, graph)
+        if reverse_deps_main:
+            print(f"\nПакеты, зависящие от исходного пакета '{args.package}':")
+            for dep in reverse_deps_main:
+                print(f"  - {dep}")
+        else:
+            print(f"\nНет других пакетов, зависящих от '{args.package}'")
+
+    print("\nЭтап 4 завершен! Обратные зависимости найдены.")
+
 def main():
     try:
         args = parse_arguments()
@@ -395,6 +436,8 @@ def main():
 
         print("\nЭтап 3 завершен. Граф зависимостей построен.")
         # ========== КОНЕЦ ЭТАПА 3 ==========
+        # Демонстрация обратных зависимостей
+        demonstrate_reverse_dependencies(args, graph)
 
     except KeyboardInterrupt:
         print("\n\n Программа прервана пользователем")
