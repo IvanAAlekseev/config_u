@@ -15,3 +15,5 @@ python main.py --package firefox --repository test_repo.txt --test-mode --ascii-
 
 # Короткие версии флагов
 python main.py -p python3 -r http://archive.ubuntu.com/ubuntu/ -t -a
+
+<img width="2876" height="1630" alt="deepseek_mermaid_20251122_864149" src="https://github.com/user-attachments/assets/2340c794-42ac-4d00-8003-915eb277bafa" />
