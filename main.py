@@ -396,6 +396,132 @@ def demonstrate_test_cases():
         )
         print(f"Пакетов: {len(graph)}, Циклов: {len(cycles)}")
 
+
+# ========== ЭТАП 5: ФУНКЦИИ ВИЗУАЛИЗАЦИИ ==========
+
+def generate_mermaid_graph(graph, start_package):
+    """Генерирует описание графа на языке Mermaid"""
+    mermaid_lines = ["graph TD"]
+
+    # Добавляем все узлы и связи
+    visited_edges = set()  # Чтобы избежать дублирования связей
+
+    for package, dependencies in graph.items():
+        for dep in dependencies:
+            edge = f"{package}-->{dep}"
+            if edge not in visited_edges:
+                mermaid_lines.append(f"    {edge}")
+                visited_edges.add(edge)
+
+    # Выделяем стартовый пакет стилем
+    mermaid_lines.append(f"    style {start_package} fill:#f9f,stroke:#333,stroke-width:2px")
+
+    return "\n".join(mermaid_lines)
+
+
+def generate_ascii_tree(graph, start_package, prefix="", is_last=True, visited=None):
+    """Генерирует ASCII-дерево зависимостей с защитой от циклов"""
+    if visited is None:
+        visited = set()
+
+    lines = []
+
+    # Текущий пакет
+    connector = "└── " if is_last else "├── "
+    lines.append(f"{prefix}{connector}{start_package}")
+
+    # Защита от циклов
+    if start_package in visited:
+        lines.append(f"{prefix}    └── ... (цикл)")
+        return lines
+
+    visited.add(start_package)
+
+    # Зависимости
+    if start_package in graph:
+        dependencies = graph[start_package]
+        new_prefix = prefix + ("    " if is_last else "│   ")
+
+        for i, dep in enumerate(dependencies):
+            is_last_dep = (i == len(dependencies) - 1)
+
+            # Рекурсивно обрабатываем зависимости
+            lines.extend(generate_ascii_tree(graph, dep, new_prefix, is_last_dep, visited.copy()))
+
+    return lines
+
+
+def visualize_dependencies(args, graph):
+    """Основная функция визуализации для этапа 5"""
+
+    # 1. Генерация Mermaid-графа
+    print("\n1. Генерация Mermaid-графа...")
+    mermaid_code = generate_mermaid_graph(graph, args.package)
+
+    # 2. Вывод Mermaid-кода на экран
+    print("\n2. Mermaid-код графа:")
+    print("-" * 50)
+    print(mermaid_code)
+    print("-" * 50)
+
+    # 3. Генерация ASCII-дерева (если задан параметр)
+    if args.ascii_tree:
+        print("\n3. ASCII-дерево зависимостей:")
+        print("-" * 40)
+        ascii_tree = generate_ascii_tree(graph, args.package)
+        for line in ascii_tree:
+            print(line)
+        print("-" * 40)
+
+    # 4. Статистика графа
+    print(f"\n4. Статистика графа:")
+    print(f"   - Всего пакетов: {len(graph)}")
+    print(f"   - Всего зависимостей: {sum(len(deps) for deps in graph.values())}")
+
+    # 5. Сравнение с штатными инструментами Ubuntu
+    print(f"\n5. Сравнение с инструментами Ubuntu (apt):")
+    print(f"   - apt show {args.package}: показывает только прямые зависимости")
+    print(f"   - apt-cache depends {args.package}: показывает зависимости")
+    print(f"   - apt-rdepends {args.package}: показывает обратные зависимости")
+    print(f"   - Наш инструмент: показывает ПОЛНЫЙ граф транзитивных зависимостей")
+    print(f"   - Основное отличие: наш инструмент показывает ВСЮ иерархию, а не только первый уровень")
+
+    return {
+        'mermaid_code': mermaid_code,
+        'graph_size': len(graph)
+    }
+
+
+def demonstrate_multiple_packages(args, get_dependencies_func, main_package):
+    """Демонстрирует визуализацию для трех различных пакетов"""
+    demo_packages = ['curl', 'wget', 'vim']
+
+    print("ДЕМОНСТРАЦИЯ ДЛЯ ТРЕХ РАЗЛИЧНЫХ ПАКЕТОВ")
+
+    for i, demo_package in enumerate(demo_packages, 1):
+        if demo_package != main_package:
+            print(f"\n--- Демонстрация {i}: пакет '{demo_package}' ---")
+
+            # Строим граф для демо-пакета
+            demo_graph, cycles = build_dependency_graph(
+                start_package=demo_package,
+                get_deps_func=get_dependencies_func,
+                max_depth=2,
+                package_filter=args.filter
+            )
+
+            if demo_graph:
+                mermaid_code = generate_mermaid_graph(demo_graph, demo_package)
+                print(f"Mermaid-код для {demo_package}:")
+                print("-" * 40)
+                print(mermaid_code)
+                print("-" * 40)
+                print(f"Статистика: {len(demo_graph)} пакетов в графе")
+            else:
+                print("   Граф пуст или не удалось построить")
+
+
+# ========== КОНЕЦ ФУНКЦИЙ ЭТАПА 5 ==========
 def main():
     try:
         args = parse_arguments()
@@ -491,6 +617,26 @@ def main():
         # ========== КОНЕЦ ЭТАПА 3 ==========
         # Демонстрация обратных зависимостей
         demonstrate_reverse_dependencies(args, graph)
+        # ========== ЭТАП 5: ВИЗУАЛИЗАЦИЯ ==========
+        print("\n" + "=" * 60)
+        print("ЭТАП 5: ВИЗУАЛИЗАЦИЯ")
+        print("=" * 60)
+
+        if graph:  # Если граф был успешно построен
+            # Основная визуализация для целевого пакета
+            visualization_result = visualize_dependencies(args, graph)
+
+            # Демонстрация для трех других пакетов
+            demonstrate_multiple_packages(args, get_dependencies_func, args.package)
+
+            print(f"\n Этап 5 завершен успешно!")
+            print(f"   Сгенерирован Mermaid-код для графа из {visualization_result['graph_size']} пакетов")
+            print(f"   Mermaid-код можно использовать в Markdown-документации")
+        else:
+            print("Не удалось построить граф для визуализации")
+
+        # ========== КОНЕЦ ЭТАПА 5 ==========
+
 
     except KeyboardInterrupt:
         print("\n\n Программа прервана пользователем")
